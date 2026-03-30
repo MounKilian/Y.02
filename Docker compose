@@ -1,0 +1,252 @@
+# Docker compose — Plateforme météo & pollution
+
+Dossier racine de l'infrastructure conteneurisée. Il regroupe l'ensemble des fichiers de configuration, Dockerfiles, scripts d'initialisation et configurations de monitoring nécessaires au déploiement complet de la plateforme.
+
+---
+
+## Structure générale
+
+```
+Docker compose/
+│
+├── docker-compose.yml          # Orchestration de tous les services
+├── setup.sh                    # Script d'initialisation complet
+├── .env.example                # Template des variables d'environnement
+├── .sops.yaml                  # Configuration chiffrement SOPS/Age
+├── .gitleaks.toml              # Règles détection secrets dans Git
+│
+├── backend/                    # Image Docker du backend Fastify
+├── frontend/                   # Image Docker du frontend Vue.js + Nginx
+├── service-data/               # Image Docker du service de collecte OpenData
+├── postgres/                   # Configuration PostgreSQL + Citus
+├── monitoring/                 # Stack Prometheus + Grafana
+└── secrets/                    # Fichiers secrets chiffrés (SOPS)
+```
+
+---
+
+## Fichiers racine
+
+### `docker-compose.yml`
+
+Point d'entrée principal. Déclare et orchestre les 13 services de la plateforme, les 7 volumes persistants, les 3 réseaux Docker isolés et les 4 secrets.
+
+Les services sont regroupés en quatre zones :
+
+| Zone | Services |
+|---|---|
+| Publique | `traefik`, `frontend`, `backend` |
+| Interne | `service_data`, `citus_master`, `citus_slave`, `citus_worker1`, `citus_worker2` |
+| Monitoring | `cadvisor`, `prometheus`, `grafana`, `postgres_exporter` |
+| CI/CD | `trivy` (profil `scan`, ne démarre pas avec `up`) |
+
+### `setup.sh`
+
+Script à exécuter une seule fois avant le premier `docker compose up`. Il enchaîne automatiquement :
+
+1. Activation de BuildKit
+2. Génération des secrets via OpenSSL (256+ bits d'entropie)
+3. Chiffrement SOPS de tous les fichiers `secrets/*.txt`
+4. Scan gitleaks pour détecter les fuites accidentelles
+5. Validation des variables du `.env`
+6. Build des images Docker
+7. Scan Trivy — bloque si CVE CRITICAL détectée
+
+```bash
+bash setup.sh
+```
+
+### `.env.example`
+
+Template à copier en `.env` avant le lancement. Contient uniquement les variables non-sensibles — les mots de passe ne sont jamais dans ce fichier.
+
+```bash
+cp .env.example .env
+# Renseigner : DOMAIN_NAME, ACME_EMAIL, OPENDATA_METEO_URL, OPENDATA_POLLUTION_URL
+```
+
+### `.sops.yaml`
+
+Configure le chiffrement SOPS avec le backend Age. Définit quels fichiers sont chiffrés automatiquement (`secrets/*.txt`) et avec quelle clé publique Age. À compléter avec la clé publique générée via `age-keygen`.
+
+### `.gitleaks.toml`
+
+Règles de détection de secrets pour gitleaks. Étend les règles par défaut avec trois règles personnalisées : DSN PostgreSQL avec mot de passe, valeurs directes dans `.env`, JWT hardcodés. Configure les exclusions pour `secrets/`, `.env.example` et `trivy-reports/`.
+
+---
+
+## Dossiers
+
+### `backend/`
+
+Contient le `Dockerfile` du service backend Node.js / Fastify.
+
+```
+backend/
+├── Dockerfile        # Build multi-stage Node:20-alpine
+└── .dockerignore     # Exclut node_modules, dist, .env, .git
+```
+
+Build en deux phases : phase `builder` (compilation TypeScript) + phase production (image Alpine légère, utilisateur non-root, sans devDependencies). Utilise BuildKit `--mount=type=secret` pour les tokens npm privés — le secret n'est jamais persisté dans les couches image.
+
+→ Voir [`backend/README.md`](./backend/README.md)
+
+---
+
+### `frontend/`
+
+Contient le `Dockerfile` et la configuration Nginx du frontend Vue.js.
+
+```
+frontend/
+├── Dockerfile        # Build multi-stage Node:20-alpine + Nginx:alpine
+├── nginx.conf        # Template Nginx (envsubst au démarrage)
+└── .dockerignore
+```
+
+Le build Vue.js produit des fichiers statiques servis par Nginx. Le `nginx.conf` est monté comme template — Nginx résout `${BACKEND_URL}` au démarrage via `envsubst`, sans recompiler l'image. Inclut le fallback Vue Router, le reverse proxy `/api/`, la compression gzip et les headers de sécurité.
+
+→ Voir [`frontend/README.md`](./frontend/README.md)
+
+---
+
+### `service-data/`
+
+Contient le `Dockerfile` du service de collecte et de calcul des indices.
+
+```
+service-data/
+├── Dockerfile        # Build multi-stage Node:20-alpine
+└── .dockerignore
+```
+
+Même stack Node.js que le backend pour la cohérence du runtime. Ce service collecte périodiquement les endpoints OpenData gouvernementaux, calcule l'indice composite météo/pollution et persiste les résultats directement dans Citus via le coordinator.
+
+→ Voir [`service-data/README.md`](./service-data/README.md)
+
+---
+
+### `postgres/`
+
+Configuration complète du cluster PostgreSQL + Citus.
+
+```
+postgres/
+├── master/
+│   ├── postgresql.conf   # WAL, réplication streaming, extension Citus
+│   └── pg_hba.conf       # Authentification scram-sha-256
+├── slave/
+│   ├── postgresql.conf   # hot_standby = on, primary_conninfo
+│   ├── pg_hba.conf
+│   └── init-slave.sh     # pg_basebackup + création standby.signal
+├── worker/
+│   ├── postgresql.conf   # Config workers Citus (shard_count, replication_factor)
+│   └── pg_hba.conf
+└── init/
+    └── 01-init-citus.sql # Extension Citus, PostGIS, schéma, sharding, workers
+```
+
+**Rôle de chaque nœud :**
+
+| Nœud | Rôle | Démarrage |
+|---|---|---|
+| `citus_master` | Coordinator Citus + Master PostgreSQL | 1er (après workers) |
+| `citus_slave` | Standby coordinator — failover automatique | Après master |
+| `citus_worker1` | Shards régions Nord/Ouest (IDF, HDF, NOR...) | 1er (sans dépendance) |
+| `citus_worker2` | Shards régions Sud/Est (AURA, PACA, OCC...) | 1er (sans dépendance) |
+
+→ Voir [`postgres/README.md`](./postgres/README.md)
+
+---
+
+### `monitoring/`
+
+Stack d'observabilité complète.
+
+```
+monitoring/
+├── prometheus.yml          # Scrape configs (cAdvisor, postgres_exporter, apps)
+├── rules.yml               # Règles d'alerte (CPU, mémoire, lag réplication, Citus)
+└── grafana/
+    └── provisioning/
+        ├── datasources/
+        │   └── prometheus.yml        # Datasource Prometheus auto-provisionnée
+        └── dashboards/
+            ├── dashboards.yml        # Config du provider de dashboards
+            └── docker-monitoring.json # Dashboard infra pré-configuré
+```
+
+**Accès Grafana :** `https://grafana.VOTRE_DOMAINE`
+Login : `admin` — Mot de passe : `secrets/grafana_password.txt`
+
+→ Voir [`monitoring/README.md`](./monitoring/README.md)
+
+---
+
+### `secrets/`
+
+Contient les fichiers de secrets chiffrés par SOPS/Age. **Ce dossier ne doit jamais être commité sans chiffrement préalable.**
+
+```
+secrets/
+├── postgres_password.txt       # Mot de passe PostgreSQL principal
+├── replication_password.txt    # Mot de passe réplication WAL Master/Slave
+├── jwt_secret.txt              # Clé de signature JWT (512 bits)
+└── grafana_password.txt        # Mot de passe administrateur Grafana
+```
+
+Les fichiers sont chiffrés avant commit (`sops --encrypt --in-place`) et déchiffrés localement avant le lancement (`sops --decrypt --in-place`). Docker les monte en **tmpfs** sous `/run/secrets/` dans les conteneurs — aucune trace sur le disque.
+
+> ⚠️ `secrets/` est dans `.gitignore`. Ne jamais forcer l'ajout avec `git add -f`.
+
+---
+
+## Démarrage rapide
+
+```bash
+# 1. Copier et compléter le .env
+cp .env.example .env && nano .env
+
+# 2. Générer la clé Age et mettre à jour .sops.yaml
+age-keygen -o ~/.config/sops/age/keys.txt
+age-keygen -y ~/.config/sops/age/keys.txt  # copier la clé publique dans .sops.yaml
+
+# 3. Initialiser (secrets, build, scan)
+bash setup.sh
+
+# 4. Démarrer
+docker compose up -d
+
+# 5. Vérifier
+docker compose ps
+```
+
+---
+
+## Ordre de démarrage
+
+```
+citus_worker1  ──┐
+                 ├──► citus_master ──► citus_slave
+citus_worker2  ──┘         │
+                           └──► service_data ──► backend ──► frontend
+                                                              traefik
+                                    cadvisor ──► prometheus ──► grafana
+```
+
+---
+
+## Variables d'environnement
+
+| Variable | Obligatoire | Description |
+|---|---|---|
+| `DOMAIN_NAME` | Oui | Domaine public (ex: `meteo.mondomaine.fr`) |
+| `ACME_EMAIL` | Oui | Email Let's Encrypt pour les certificats TLS |
+| `POSTGRES_USER` | Oui | Nom d'utilisateur PostgreSQL applicatif |
+| `POSTGRES_DB` | Oui | Nom de la base de données |
+| `OPENDATA_METEO_URL` | Oui | Endpoint OpenData météo gouvernemental |
+| `OPENDATA_POLLUTION_URL` | Oui | Endpoint OpenData pollution gouvernemental |
+| `GRAFANA_ADMIN_USER` | Non | Login Grafana (défaut : `admin`) |
+| `COLLECT_INTERVAL_MS` | Non | Intervalle collecte Data en ms (défaut : `3600000`) |
+
+> Les mots de passe ne sont **jamais** dans `.env` — ils sont dans `secrets/`.
