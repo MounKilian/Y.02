@@ -6,7 +6,7 @@ import { initDb } from '../src/db.js';
 dotenv.config();
 
 const INTERVAL = process.env.WORKER_INTERVAL_MIN || 5;
-const DATA_API_URL = process.env.DATA_API_URL || 'http://localhost:4000/api/mock';
+const DATA_API_URL = process.env.DATA_API_URL || 'http://localhost:8000/data?limit=5000';
 
 const db = initDb();
 

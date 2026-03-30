@@ -221,7 +221,7 @@ C'est le travail de l'equipe **Data/IA** :
 
 ```
 projet/
-├── api/                    # Express (port 4000)
+├── api/                    # Express (port 8000)
 │   ├── server.js
 │   ├── routes/
 │   │   └── stations.js     # GET /api/stations + filtres
@@ -399,7 +399,7 @@ Zero dependance BDD spatiale, fonctionne en memoire Node.js.
 
 Premiere etape : creer la structure du projet, installer les outils necessaires et verifier que tout demarre correctement. On a mis en place trois services independants (serveur API, worker, interface web) qui peuvent tourner en parallele avec une seule commande.
 
-**Resultat :** Le projet demarre, l'API repond sur le port 4000.
+**Resultat :** Le projet demarre, l'API repond sur le port 8000.
 
 ---
 

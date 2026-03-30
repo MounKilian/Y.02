@@ -2,6 +2,7 @@ const API_BASE = '/api';
 
 export async function fetchStations(filters = {}) {
   const params = new URLSearchParams();
+  console.log('Fetching stations with filters:', filters);
 
   if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
   if (filters.dateTo) params.set('dateTo', filters.dateTo);
