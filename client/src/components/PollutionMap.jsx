@@ -2,7 +2,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 're
 import L from 'leaflet';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { getColor, getLabel } from '../utils/colors';
-import { fetchClusters } from '../utils/api';
+import { fetchClusters, fetchStations as fetchStationsApi } from '../utils/api';
 
 function createIcon(index) {
   const color = getColor(index);
@@ -98,7 +98,7 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function StationPopup({ station }) {
+function StationPopup({ station, hasDateFilter }) {
   const color = getColor(station.avg_index);
   const label = getLabel(station.avg_index);
 
@@ -113,6 +113,10 @@ function StationPopup({ station }) {
         <div className="popup-index-value">{Math.round(station.avg_index)}<span style={{ fontSize: 14, fontWeight: 400 }}> / 100</span></div>
         <div className="popup-index-label">Indice de pollution : {label}</div>
       </div>
+
+      {hasDateFilter && (
+        <div className="popup-avg-notice">Valeurs moyennees sur la periode selectionnee</div>
+      )}
 
       <div className="popup-section-title">Polluants (moyenne)</div>
       <div className="popup-grid">
@@ -177,23 +181,19 @@ function ClusterPopup({ cluster }) {
   );
 }
 
-// Inner component that renders markers and handles cluster clicks
-function MapContent({ filters, flyTo, onStatsUpdate }) {
+// Inner component — cluster mode
+function ClusterContent({ filters, flyTo, onStatsUpdate, hasDateFilter }) {
   const [data, setData] = useState([]);
   const map = useMap();
 
   const handleDataLoaded = useCallback((newData) => {
     setData(newData);
-    // Update stats in parent
     const stations = newData.filter(d => d.type === 'station');
-    const allItems = newData;
-    onStatsUpdate(stations, allItems);
+    onStatsUpdate(stations, newData);
   }, [onStatsUpdate]);
 
   function handleClusterClick(cluster) {
-    map.flyTo([cluster.latitude, cluster.longitude], cluster.expansion_zoom, {
-      duration: 0.8,
-    });
+    map.flyTo([cluster.latitude, cluster.longitude], cluster.expansion_zoom, { duration: 0.8 });
   }
 
   return (
@@ -216,13 +216,9 @@ function MapContent({ filters, flyTo, onStatsUpdate }) {
           );
         } else {
           return (
-            <Marker
-              key={item.code}
-              position={[item.latitude, item.longitude]}
-              icon={createIcon(item.avg_index)}
-            >
+            <Marker key={item.code} position={[item.latitude, item.longitude]} icon={createIcon(item.avg_index)}>
               <Popup maxWidth={280}>
-                <StationPopup station={item} />
+                <StationPopup station={item} hasDateFilter={hasDateFilter} />
               </Popup>
             </Marker>
           );
@@ -232,14 +228,40 @@ function MapContent({ filters, flyTo, onStatsUpdate }) {
   );
 }
 
-export default function PollutionMap({ filters, flyTo, onStatsUpdate }) {
+// Inner component — stations mode (no clustering, uses /api/stations)
+function StationsContent({ filters, flyTo, onStatsUpdate, hasDateFilter }) {
+  const [stations, setStations] = useState([]);
+
+  useEffect(() => {
+    fetchStationsApi(filters)
+      .then(data => {
+        setStations(data.stations);
+        onStatsUpdate(data.stations, data.stations);
+      })
+      .catch(err => console.error('[Map] Stations fetch error:', err));
+  }, [filters, onStatsUpdate]);
+
+  return (
+    <>
+      <FlyToHandler flyTo={flyTo} />
+      {stations.map((station) => (
+        <Marker key={station.code} position={[station.latitude, station.longitude]} icon={createIcon(station.avg_index)}>
+          <Popup maxWidth={280}>
+            <StationPopup station={station} hasDateFilter={hasDateFilter} />
+          </Popup>
+        </Marker>
+      ))}
+    </>
+  );
+}
+
+export default function PollutionMap({ filters, flyTo, onStatsUpdate, view, hasDateFilter }) {
   return (
     <MapContainer
       center={[46.6, 2.5]}
       zoom={6}
       className="leaflet-container"
       preferCanvas={true}
-      whenReady={() => console.log('[Map] Ready')}
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
@@ -249,7 +271,11 @@ export default function PollutionMap({ filters, flyTo, onStatsUpdate }) {
         keepBuffer={4}
         maxZoom={19}
       />
-      <MapContent filters={filters} flyTo={flyTo} onStatsUpdate={onStatsUpdate} />
+      {view === 'clusters' ? (
+        <ClusterContent filters={filters} flyTo={flyTo} onStatsUpdate={onStatsUpdate} hasDateFilter={hasDateFilter} />
+      ) : (
+        <StationsContent filters={filters} flyTo={flyTo} onStatsUpdate={onStatsUpdate} hasDateFilter={hasDateFilter} />
+      )}
     </MapContainer>
   );
 }

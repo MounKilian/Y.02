@@ -3,12 +3,17 @@ import PollutionMap from './components/PollutionMap';
 import Filters from './components/Filters';
 import Legend from './components/Legend';
 import StatsPanel from './components/StatsPanel';
+import ViewSwitcher from './components/ViewSwitcher';
+import DataTable from './components/DataTable';
 
 function App() {
   const [filters, setFilters] = useState({});
   const [flyTo, setFlyTo] = useState(null);
   const [stations, setStations] = useState([]);
   const [totalItems, setTotalItems] = useState(0);
+  const [view, setView] = useState('clusters');
+
+  const hasDateFilter = !!(filters.dateFrom || filters.dateTo);
 
   function handleFilter(newFilters) {
     setFilters(newFilters);
@@ -34,8 +39,9 @@ function App() {
         </div>
         <div className="header-stats">
           <div className="header-stat">
-            <strong>{totalItems}</strong> elements
-            {clusterCount > 0 && <span> ({clusterCount} clusters)</span>}
+            <strong>{view === 'table' ? stations.length : totalItems}</strong>
+            {view === 'table' ? ' stations' : ' elements'}
+            {clusterCount > 0 && view === 'clusters' && <span> ({clusterCount} clusters)</span>}
           </div>
           <div className="header-stat">
             Qualite de l'air en France
@@ -51,11 +57,19 @@ function App() {
         </aside>
 
         <div className="map-wrapper">
-          <PollutionMap
-            filters={filters}
-            flyTo={flyTo}
-            onStatsUpdate={handleStatsUpdate}
-          />
+          <ViewSwitcher view={view} onViewChange={setView} />
+
+          {view === 'table' ? (
+            <DataTable stations={stations} hasDateFilter={hasDateFilter} />
+          ) : (
+            <PollutionMap
+              filters={filters}
+              flyTo={flyTo}
+              onStatsUpdate={handleStatsUpdate}
+              view={view}
+              hasDateFilter={hasDateFilter}
+            />
+          )}
         </div>
       </div>
     </>
