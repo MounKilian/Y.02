@@ -84,16 +84,11 @@ function MapSection() {
   function toggleFullscreen() {
     const next = !fullscreen;
     setFullscreen(next);
-    // Lock/unlock body scroll
     document.body.style.overflow = next ? 'hidden' : '';
-    // Leaflet needs to recalculate its size after container change
-    setTimeout(() => {
-      const leafletMap = mapContainerRef.current?.querySelector('.leaflet-container');
-      if (leafletMap && leafletMap._leaflet_id) {
-        // Trigger resize event so Leaflet recalculates
-        window.dispatchEvent(new Event('resize'));
-      }
-    }, 100);
+    // Leaflet needs multiple resize triggers to recalculate properly
+    [50, 200, 500].forEach(delay => {
+      setTimeout(() => window.dispatchEvent(new Event('resize')), delay);
+    });
   }
 
   const clusterCount = totalItems - stations.length;
