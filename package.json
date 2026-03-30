@@ -1,0 +1,16 @@
+{
+  "name": "y02-airviz",
+  "version": "1.0.0",
+  "description": "AirViz — Qualite de l'air en France (Challenge 48h)",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "seed": "cd server && npm run seed",
+    "install:all": "cd server && npm install && cd ../client && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}
