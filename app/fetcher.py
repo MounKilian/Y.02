@@ -80,12 +80,15 @@ def fetch_pollution_measures(days: int = 2) -> pd.DataFrame:
                 continue
 
             df = pd.read_csv(
-                io.StringIO(resp.text),
+                io.BytesIO(resp.content),
                 sep=";",
                 encoding="utf-8-sig",
                 on_bad_lines="skip",
             )
-            df.columns = [c.strip().lower().replace(" ", "_").replace("'", "'") for c in df.columns]
+            df.columns = [
+                c.strip().strip('"').lower().replace(" ", "_").replace("\u2019", "'")
+                for c in df.columns
+            ]
 
             rename = {
                 "code_site": "station_id",
