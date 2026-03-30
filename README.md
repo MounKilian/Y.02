@@ -1,4 +1,4 @@
-# AirViz — Qualité de l'air en France
+# AirViz — Qualité de l'air en France :
 
 Application web de visualisation de la qualité de l'air en France.
 Carte interactive avec données pollution et météo, filtrage par région/date/indice, clustering intelligent.
