@@ -4,11 +4,7 @@ Téléchargement et parsing des données brutes depuis data.gouv.fr.
 
 Deux sources :
   - LCSQA  : concentrations horaires de polluants + métadonnées stations
-             ⚠️  Depuis le 11/09/2025, les mesures temps réel sont derrière
-             un bucket MinIO privé. Le fetcher utilise des mesures synthétiques
-             réalistes en fallback (basées sur la distribution statistique des
-             stations).  Pour utiliser les vraies données, remplacer
-             POLLUTION_CSV_URL par une URL signée (accès INERIS).
+             URL directe : .../temps-reel/{YYYY}/FR_E2_{YYYY-MM-DD}.csv
   - Synop  : observations météo toutes les 3h + coordonnées des postes
 """
 
@@ -16,11 +12,9 @@ from __future__ import annotations
 
 import io
 import logging
-import random
 from datetime import datetime, timedelta
 from functools import lru_cache
 
-import numpy as np
 import pandas as pd
 import requests
 
@@ -30,10 +24,9 @@ logger = logging.getLogger(__name__)
 # URLs upstream (data.gouv.fr)
 # ---------------------------------------------------------------------------
 
-# ⚠️ Cette URL pointe désormais vers le browser MinIO (HTML, pas CSV).
-# Laissée pour référence. Le fetcher détecte ce cas et utilise le fallback.
-POLLUTION_CSV_URL = (
-    "https://www.data.gouv.fr/api/1/datasets/r/157ceed4-ce03-4c7d-9cd7-ae60ea07417b"
+POLLUTION_CSV_BASE = (
+    "https://object.files.data.gouv.fr/ineris-prod/lcsqa/"
+    "concentrations-de-polluants-atmospheriques-reglementes/temps-reel"
 )
 
 # URL directe du XLS stations (stable, accessible)
@@ -61,96 +54,76 @@ def _get(url: str, timeout: int = 60) -> requests.Response:
 # Pollution — mesures
 # ---------------------------------------------------------------------------
 
-# Distributions statistiques réalistes (µg/m³) basées sur les normes EU
-# utilisées pour le fallback synthétique quand l'API LCSQA est inaccessible.
-_SYNTHETIC_STATS = {
-    "NO2":  {"mean": 35.0, "std": 20.0, "min": 0.0, "max": 200.0},
-    "O3":   {"mean": 55.0, "std": 25.0, "min": 0.0, "max": 200.0},
-    "PM10": {"mean": 20.0, "std": 10.0, "min": 0.0, "max": 100.0},
-    "PM25": {"mean": 12.0, "std": 7.0,  "min": 0.0, "max": 60.0},
-    "SO2":  {"mean": 10.0, "std": 8.0,  "min": 0.0, "max": 100.0},
-    "CO":   {"mean": 0.4,  "std": 0.3,  "min": 0.0, "max": 5.0},
-}
+
+def _pollution_csv_url(date: datetime) -> str:
+    """Construit l'URL directe du CSV LCSQA pour une date donnée."""
+    return f"{POLLUTION_CSV_BASE}/{date.year}/FR_E2_{date.strftime('%Y-%m-%d')}.csv"
 
 
-def _generate_synthetic_measures(station_ids: list[str], n_hours: int = 24) -> pd.DataFrame:
+def fetch_pollution_measures(days: int = 2) -> pd.DataFrame:
     """
-    Génère des mesures synthétiques réalistes pour la démo.
-    Appelé automatiquement quand l'API LCSQA est inaccessible.
+    Télécharge les mesures horaires LCSQA pour les N derniers jours.
+
+    URL : .../temps-reel/{YYYY}/FR_E2_{YYYY-MM-DD}.csv
+    Colonnes normalisées : station_id, date_debut, date_fin, polluant, valeur
     """
-    rng = np.random.default_rng(seed=42)
-    records = []
-    now = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
+    logger.info("Téléchargement mesures pollution (%d jours)…", days)
+    frames = []
 
-    for station_id in station_ids:
-        for h in range(n_hours):
-            dt = now - timedelta(hours=h)
-            for polluant, stats in _SYNTHETIC_STATS.items():
-                val = rng.normal(stats["mean"], stats["std"])
-                val = float(np.clip(val, stats["min"], stats["max"]))
-                records.append({
-                    "station_id": station_id,
-                    "date_debut": dt,
-                    "date_fin": dt + timedelta(hours=1),
-                    "polluant": polluant,
-                    "valeur": round(val, 2),
-                    "unite": "µg/m³",
-                    "validite": 1,
-                    "source": "synthetic",
-                })
+    for offset in range(days):
+        date = datetime.utcnow() - timedelta(days=offset)
+        url = _pollution_csv_url(date)
+        try:
+            resp = _get(url, timeout=30)
+            if "text/html" in resp.headers.get("content-type", ""):
+                logger.warning("HTML reçu pour %s — skip", date.strftime("%Y-%m-%d"))
+                continue
 
-    df = pd.DataFrame(records)
-    logger.warning(
-        "⚠️  Mesures SYNTHÉTIQUES utilisées (%d lignes) — API LCSQA inaccessible.", len(df)
-    )
-    return df
+            df = pd.read_csv(
+                io.BytesIO(resp.content),
+                sep=";",
+                encoding="utf-8-sig",
+                on_bad_lines="skip",
+            )
+            df.columns = [
+                c.strip().strip('"').lower().replace(" ", "_").replace("\u2019", "'")
+                for c in df.columns
+            ]
 
+            rename = {
+                "code_site": "station_id",
+                "nom_site": "nom_station",
+                "type_d'implantation": "type_implantation",
+                "polluant": "polluant",
+                "valeur": "valeur",
+                "date_de_début": "date_debut",
+                "date_de_fin": "date_fin",
+                "unité_de_mesure": "unite",
+                "validité": "validite",
+            }
+            df = df.rename(columns={k: v for k, v in rename.items() if k in df.columns})
 
-def fetch_pollution_measures(station_ids: list[str] | None = None) -> pd.DataFrame:
-    """
-    Retourne les concentrations horaires temps réel (LCSQA).
-    Si l'API LCSQA retourne du HTML (MinIO browser) ou échoue,
-    bascule automatiquement sur des données synthétiques.
+            if "date_debut" in df.columns:
+                df["date_debut"] = pd.to_datetime(df["date_debut"], errors="coerce")
+            if "date_fin" in df.columns:
+                df["date_fin"] = pd.to_datetime(df["date_fin"], errors="coerce")
+            if "valeur" in df.columns:
+                df["valeur"] = pd.to_numeric(df["valeur"], errors="coerce")
 
-    Colonnes : station_id, date_debut, polluant, valeur
-    """
-    logger.info("Téléchargement mesures pollution…")
-    try:
-        resp = _get(POLLUTION_CSV_URL, timeout=20)
-        content_type = resp.headers.get("content-type", "")
-        # L'URL pointe vers le browser MinIO (retourne du HTML) → fallback
-        if "text/html" in content_type or len(resp.content) < 5000:
-            raise ValueError("Réponse HTML reçue — API LCSQA migrée vers MinIO.")
+            df["source"] = "lcsqa"
+            frames.append(df)
+            logger.info("  %s : %d lignes", date.strftime("%Y-%m-%d"), len(df))
 
-        df = pd.read_csv(io.StringIO(resp.text), sep=";", encoding="utf-8", on_bad_lines="skip")
-        df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
+        except Exception as exc:
+            logger.warning("  %s : échec (%s)", date.strftime("%Y-%m-%d"), exc)
 
-        rename = {
-            "code_station": "station_id",
-            "code_polluant": "polluant",
-            "concentration": "valeur",
-            "date_de_debut": "date_debut",
-            "date_de_fin": "date_fin",
-        }
-        df = df.rename(columns={k: v for k, v in rename.items() if k in df.columns})
+    if not frames:
+        logger.error("Aucune donnée pollution récupérée !")
+        return pd.DataFrame(columns=["station_id", "date_debut", "polluant", "valeur"])
 
-        if "date_debut" in df.columns:
-            df["date_debut"] = pd.to_datetime(df["date_debut"], errors="coerce")
-        if "valeur" in df.columns:
-            df["valeur"] = pd.to_numeric(df["valeur"], errors="coerce")
-
-        if len(df) == 0:
-            raise ValueError("CSV vide reçu.")
-
-        df["source"] = "lcsqa"
-        logger.info("Mesures pollution (LCSQA) : %d lignes", len(df))
-        return df
-
-    except Exception as exc:
-        logger.warning("Fallback synthétique : %s", exc)
-        ids = station_ids or ["FR01001", "FR01002", "FR13001", "FR75001", "FR69001",
-                              "FR31001", "FR33001", "FR44001", "FR59001", "FR06001"]
-        return _generate_synthetic_measures(ids)
+    result = pd.concat(frames, ignore_index=True)
+    logger.info("Mesures pollution (LCSQA) : %d lignes total", len(result))
+    return result
 
 
 # ---------------------------------------------------------------------------

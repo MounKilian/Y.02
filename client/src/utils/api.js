@@ -13,7 +13,7 @@ export async function fetchStations(filters = {}) {
   if (filters.maxIndex !== undefined && filters.maxIndex !== '') params.set('maxIndex', filters.maxIndex);
 
   const query = params.toString();
-  const url = `${API_BASE}/stations` //${query ? `?${query}` : ''}`;
+  const url = `${API_BASE}/stations${query ? `?${query}` : ''}`;
 
   const res = await fetch(url);
   if (!res.ok) throw new Error(`API error: ${res.status}`);
@@ -30,7 +30,7 @@ export async function fetchClusters({ zoom, bbox, dateFrom, dateTo, minIndex, ma
   if (minIndex !== undefined && minIndex !== '') params.set('minIndex', minIndex);
   if (maxIndex !== undefined && maxIndex !== '') params.set('maxIndex', maxIndex);
 
-  const res = await fetch(`${API_BASE}/clusters`) //?${params}`);
+  const res = await fetch(`${API_BASE}/clusters?${params}`);
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
 }
