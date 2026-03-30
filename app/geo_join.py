@@ -113,11 +113,27 @@ def merge_pollution_meteo(
     )
 
     # Jointure via la table de correspondance
-    merged = (
-        poll_pivot
-        .merge(station_mapping[["station_id", "numer_sta", "dist_km"]], on="station_id", how="inner")
-        .merge(meteo_agg, on=["numer_sta", "heure"], how="left")
+    poll_with_mapping = poll_pivot.merge(
+        station_mapping[["station_id", "numer_sta", "dist_km"]], on="station_id", how="inner"
     )
+
+    # merge_asof : prend la dernière observation météo disponible (tolérance 24h)
+    poll_with_mapping = poll_with_mapping.sort_values("heure")
+    meteo_agg = meteo_agg.sort_values("heure")
+
+    merged_parts = []
+    for numer_sta, group in poll_with_mapping.groupby("numer_sta"):
+        meteo_sta = meteo_agg[meteo_agg["numer_sta"] == numer_sta]
+        if meteo_sta.empty:
+            merged_parts.append(group)
+            continue
+        part = pd.merge_asof(
+            group, meteo_sta.drop(columns=["numer_sta"]),
+            on="heure", direction="backward", tolerance=pd.Timedelta("24h"),
+        )
+        merged_parts.append(part)
+
+    merged = pd.concat(merged_parts, ignore_index=True) if merged_parts else poll_with_mapping
 
     logger.info("Dataset fusionné : %d lignes", len(merged))
     return merged
