@@ -1,0 +1,163 @@
+# Postgres
+
+Configuration complète du cluster **PostgreSQL 16 + Citus 12**. Ce dossier contient les fichiers de configuration de chaque nœud du cluster (Master, Slave, Workers) ainsi que le script SQL d'initialisation exécuté au premier démarrage.
+
+---
+
+## Architecture du cluster
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  Coordinator (citus_master)                              │
+│  ├── Reçoit toutes les requêtes SQL applicatives         │
+│  ├── Route vers les workers selon region_code            │
+│  └── Réplique son WAL vers citus_slave (streaming)       │
+│                          │                               │
+│                          ▼                               │
+│  Standby (citus_slave)                                   │
+│  ├── Réplique le WAL du Master en continu                │
+│  ├── Répond aux requêtes en lecture seule                │
+│  └── Promu automatiquement en cas de failover            │
+└──────────────────────────────────────────────────────────┘
+
+┌─────────────────────┐    ┌─────────────────────┐
+│  citus_worker1       │    │  citus_worker2       │
+│  16 shards           │    │  16 shards           │
+│  IDF HDF NOR BRE     │    │  AURA PACA OCC NAQ   │
+│  PDL CVL BFC         │    │  GES COR             │
+└─────────────────────┘    └─────────────────────┘
+```
+
+**Ordre de démarrage :**
+
+Les workers démarrent en premier (sans dépendance). Le coordinator attend que les deux workers soient `healthy` avant de démarrer — garantissant que `citus_add_node()` dans `init/01-init-citus.sql` réussit systématiquement au premier lancement.
+
+---
+
+## Structure
+
+```
+postgres/
+├── master/
+│   ├── postgresql.conf   # Configuration du coordinator Master
+│   └── pg_hba.conf       # Règles d'authentification Master
+├── slave/
+│   ├── postgresql.conf   # Configuration du standby
+│   ├── pg_hba.conf       # Règles d'authentification Slave
+│   └── init-slave.sh     # Initialisation par pg_basebackup
+├── worker/
+│   ├── postgresql.conf   # Configuration partagée des workers
+│   └── pg_hba.conf       # Règles d'authentification workers
+└── init/
+    └── 01-init-citus.sql # Script d'initialisation — exécuté une seule fois
+```
+
+---
+
+## master/postgresql.conf
+
+Configure le coordinator pour la réplication WAL et l'extension Citus.
+
+| Paramètre | Valeur | Justification |
+|---|---|---|
+| `wal_level` | `replica` | Active les journaux WAL nécessaires à la réplication streaming |
+| `max_wal_senders` | `5` | 1 Slave + 1 pg_basebackup + 2 workers + 1 secours |
+| `wal_keep_size` | `256MB` | WAL conservé pour permettre au Slave de rattraper un retard sans reconstruire |
+| `max_replication_slots` | `5` | Slots nommés — garantit la conservation des WAL même pendant une déconnexion prolongée |
+| `synchronous_commit` | `off` | Performance d'écriture prioritaire — acceptable pour des données météo périodiques |
+| `shared_preload_libraries` | `citus` | Chargement de l'extension Citus au démarrage — obligatoire |
+
+---
+
+## slave/postgresql.conf
+
+Configure le standby pour la réplication et le mode lecture seule.
+
+| Paramètre | Valeur | Justification |
+|---|---|---|
+| `hot_standby` | `on` | Autorise les connexions en lecture seule pendant la récupération WAL |
+| `hot_standby_feedback` | `on` | Informe le Master des transactions en cours — évite les query conflicts |
+| `primary_conninfo` | `host=citus_master` | DNS Docker interne — résolution automatique sans IP fixe |
+| `primary_slot_name` | `slave_slot` | Slot de réplication nommé — conservation garantie des WAL |
+| `recovery_target_timeline` | `latest` | Suit la timeline la plus récente après un failover |
+
+---
+
+## slave/init-slave.sh
+
+Exécuté par `docker-entrypoint-initdb.d` au premier démarrage du Slave (PGDATA vide). Il remplace l'initialisation PostgreSQL standard par une copie des données du Master.
+
+**Séquence d'exécution :**
+
+1. Lecture du mot de passe de réplication depuis `/run/secrets/replication_password`
+2. Attente que le Master soit prêt (`pg_isready` en boucle)
+3. Suppression du PGDATA initialisé par l'entrypoint Docker (incompatible avec pg_basebackup)
+4. Exécution de `pg_basebackup -R` : copie complète des données + génération automatique de `standby.signal` et `postgresql.auto.conf`
+5. Création du slot de réplication nommé `slave_slot` sur le Master
+6. Ajout de `primary_slot_name` dans `postgresql.auto.conf`
+
+---
+
+## worker/postgresql.conf
+
+Configuration partagée par `citus_worker1` et `citus_worker2`.
+
+| Paramètre | Valeur | Justification |
+|---|---|---|
+| `shared_preload_libraries` | `citus` | Obligatoire sur les workers comme sur le coordinator |
+| `citus.shard_count` | `32` | 32 shards répartis sur 2 workers = 16 par worker |
+| `citus.shard_replication_factor` | `1` | Pas de réplication inter-workers — HA assurée au niveau coordinator |
+| `max_connections` | `100` | Moins que le Master : seul le coordinator se connecte aux workers |
+
+---
+
+## init/01-init-citus.sql
+
+Exécuté une seule fois par `docker-entrypoint-initdb.d` lors de la première initialisation du coordinator (PGDATA vide). Non ré-exécuté lors des redémarrages ultérieurs.
+
+**Opérations dans l'ordre :**
+
+1. `CREATE EXTENSION citus` — activation du moteur de sharding distribué
+2. `CREATE EXTENSION postgis` — types géographiques et requêtes spatiales
+3. Création de l'utilisateur `replicator` avec le rôle `REPLICATION`
+4. Création de la table `stations` avec colonne `geom` (PostGIS) et index spatial GIST
+5. Création de la table `mesures` avec clé primaire composite `(id, region_code)` — requis par Citus
+6. `create_distributed_table('stations', 'region_code')` — distribution sur les workers
+7. `create_distributed_table('mesures', 'region_code', colocate_with => 'stations')` — co-localisation
+8. `citus_add_node('citus_worker1', 5432)` + `citus_add_node('citus_worker2', 5432)` — enregistrement des workers
+
+> La co-localisation garantit que les JOINs `stations/mesures` filtrés par `region_code` sont exécutés localement sur le worker concerné, sans transfert de données inter-nœuds.
+
+---
+
+## pg_hba.conf — Authentification
+
+Tous les nœuds utilisent `scram-sha-256` (recommandé depuis PostgreSQL 14) pour les connexions réseau. `trust` est réservé aux connexions via socket Unix locales (utilisées par les scripts d'initialisation dans le même conteneur).
+
+```
+local   all   all                     trust          # Socket Unix — même conteneur
+host    all   all   172.16.0.0/12     scram-sha-256  # Réseau Docker bridge
+host    all   all   10.0.0.0/8        scram-sha-256  # Réseau alternatif Docker
+```
+
+---
+
+## Commandes de diagnostic
+
+```bash
+# État de la réplication (sur le Master)
+docker exec citus_master psql -U $POSTGRES_USER -d $POSTGRES_DB \
+  -c "SELECT client_addr, state, replay_lag FROM pg_stat_replication;"
+
+# Le Slave est-il en standby ?
+docker exec citus_slave psql -U $POSTGRES_USER -d $POSTGRES_DB \
+  -c "SELECT pg_is_in_recovery();"
+
+# Répartition des shards sur les workers
+docker exec citus_master psql -U $POSTGRES_USER -d $POSTGRES_DB \
+  -c "SELECT nodename, count(*) FROM pg_dist_shard_placement GROUP BY nodename;"
+
+# Workers actifs dans le cluster Citus
+docker exec citus_master psql -U $POSTGRES_USER -d $POSTGRES_DB \
+  -c "SELECT * FROM citus_get_active_worker_nodes();"
+```
