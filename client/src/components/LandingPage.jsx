@@ -204,38 +204,16 @@ export default function LandingPage() {
           <div className="howto-steps">
             <div className="howto-step">
               <div className="step-number">01</div>
-              <div className="step-icon">
-                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                  <path d="M24 4v8M24 36v8M4 24h8M36 24h8" />
-                  <circle cx="24" cy="24" r="12" strokeDasharray="4 3" />
-                  <path d="M24 18v6l4 3" />
-                </svg>
-              </div>
               <h3>Collecte</h3>
               <p>Un worker interroge automatiquement les sources de donnees gouvernementales toutes les 5 minutes et stocke les mesures en base de donnees.</p>
             </div>
             <div className="howto-step">
               <div className="step-number">02</div>
-              <div className="step-icon">
-                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                  <path d="M6 38l10-14 8 8 10-16 8 10" />
-                  <circle cx="16" cy="24" r="2" fill="currentColor" />
-                  <circle cx="24" cy="32" r="2" fill="currentColor" />
-                  <circle cx="34" cy="16" r="2" fill="currentColor" />
-                </svg>
-              </div>
               <h3>Analyse</h3>
               <p>Les donnees de pollution et de meteo sont croisees pour calculer un indice de qualite de l'air de 0 a 100.</p>
             </div>
             <div className="howto-step">
               <div className="step-number">03</div>
-              <div className="step-icon">
-                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                  <path d="M24 4C14 4 6 12 6 22c0 12 18 22 18 22s18-10 18-22c0-10-8-18-18-18z" />
-                  <circle cx="24" cy="22" r="6" />
-                  <circle cx="24" cy="22" r="2" fill="currentColor" />
-                </svg>
-              </div>
               <h3>Visualisation</h3>
               <p>Chaque station apparait sur une carte interactive. Cliquez pour le detail, filtrez par region ou niveau de pollution.</p>
             </div>
