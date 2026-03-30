@@ -137,8 +137,12 @@ export default function LandingPage() {
   return (
     <div className="landing">
 
+      {/* Ligne de progression verticale */}
+      <div className="progress-line" />
+
       {/* ── Hero ──────────────────────────── */}
       <section className="hero-section">
+        <div className="hero-bg" />
         <div className="hero-particles">
           {Array.from({ length: 25 }, (_, i) => (
             <div key={i} className="particle" style={{
@@ -175,6 +179,7 @@ export default function LandingPage() {
 
       {/* ── Le constat ────────────────────── */}
       <Section className="constat-section">
+        <div className="section-bg-image" style={{ backgroundImage: 'url(/images/particles-bg.png)' }} />
         <div className="section-inner">
           <div className="section-label">Le constat</div>
           <h2 className="section-heading">
@@ -306,6 +311,13 @@ export default function LandingPage() {
               <p>PM2.5, PM10, NO₂, O₃, SO₂, CO, NOx, NO, Benzene — chaque mesure detaillee.</p>
             </div>
           </div>
+        </div>
+      </Section>
+
+      {/* ── Image France ─────────────────── */}
+      <Section className="france-section">
+        <div className="france-image-wrapper">
+          <img src="/images/france-data.png" alt="France data visualization" className="france-image" />
         </div>
       </Section>
 
