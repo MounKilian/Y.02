@@ -137,9 +137,6 @@ export default function LandingPage() {
   return (
     <div className="landing">
 
-      {/* Ligne de progression verticale */}
-      <div className="progress-line" />
-
       {/* ── Hero ──────────────────────────── */}
       <section className="hero-section">
         <div className="hero-bg" />
