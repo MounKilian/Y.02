@@ -127,11 +127,12 @@
 }
 
 .hero-logo {
-  width: 64px;
-  height: 64px;
-  margin-bottom: 20px;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 24px;
+  display: block;
   animation: fade-in-up 0.8s ease both;
-  filter: drop-shadow(0 0 20px rgba(16, 185, 129, 0.3));
+  filter: drop-shadow(0 0 24px rgba(16, 185, 129, 0.4));
 }
 
 .hero-badge {
