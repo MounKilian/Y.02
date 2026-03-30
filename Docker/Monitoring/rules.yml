@@ -1,0 +1,139 @@
+# =============================================================================
+# rules.yml — Règles d'alerte Prometheus
+#
+# Les alertes sont évaluées toutes les 15s (evaluation_interval dans
+# prometheus.yml). Le champ 'for' définit la durée pendant laquelle
+# la condition doit être vraie avant déclenchement — évite les faux positifs
+# lors des redémarrages normaux de conteneurs.
+# =============================================================================
+
+groups:
+
+  # ---------------------------------------------------------------------------
+  # Disponibilité des services
+  # ---------------------------------------------------------------------------
+  - name: disponibilite
+    rules:
+
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        # 'up' est une métrique générée par Prometheus : vaut 1 si le dernier
+        # scraping du job a réussi, 0 sinon. Une valeur 0 pendant 1 minute
+        # indique un service réellement indisponible (pas un simple redémarrage).
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.job }} indisponible"
+          description: "Le service {{ $labels.job }} ({{ $labels.instance }}) n'est plus accessible depuis 1 minute."
+
+      - alert: ContainerRestarting
+        expr: rate(container_last_seen{name!=""}[5m]) == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Conteneur {{ $labels.name }} en boucle de redémarrage"
+          description: "Le conteneur {{ $labels.name }} redémarre en boucle (CrashLoopBackOff)."
+
+
+  # ---------------------------------------------------------------------------
+  # Ressources système des conteneurs (via cAdvisor)
+  # ---------------------------------------------------------------------------
+  - name: ressources
+    rules:
+
+      - alert: ContainerCpuHigh
+        expr: |
+          rate(container_cpu_usage_seconds_total{name!=""}[5m]) * 100 > 80
+        for: 5m
+        # Utilisation CPU supérieure à 80% pendant 5 minutes consécutives.
+        # rate() calcule le taux d'utilisation sur une fenêtre de 5 minutes,
+        # lissant les pics ponctuels (ex: garbage collection Node.js).
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU élevé sur {{ $labels.name }}"
+          description: "Le conteneur {{ $labels.name }} utilise {{ $value | printf \"%.1f\" }}% de CPU depuis 5 minutes."
+
+      - alert: ContainerMemoryHigh
+        expr: |
+          container_memory_usage_bytes{name!=""} /
+          container_spec_memory_limit_bytes{name!=""} * 100 > 85
+        for: 5m
+        # Utilisation mémoire supérieure à 85% de la limite définie.
+        # Si container_spec_memory_limit_bytes = 0 (pas de limite), cette
+        # alerte ne se déclenche pas — définir des limits: memory dans Compose.
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mémoire élevée sur {{ $labels.name }}"
+          description: "Le conteneur {{ $labels.name }} utilise {{ $value | printf \"%.1f\" }}% de sa mémoire limite."
+
+      - alert: ContainerMemoryCritical
+        expr: |
+          container_memory_usage_bytes{name!=""} /
+          container_spec_memory_limit_bytes{name!=""} * 100 > 95
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Mémoire critique sur {{ $labels.name }} — risque OOM Kill"
+          description: "Le conteneur {{ $labels.name }} est à {{ $value | printf \"%.1f\" }}% de sa limite mémoire. OOM Kill imminent."
+
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL / Citus (via postgres_exporter)
+  # ---------------------------------------------------------------------------
+  - name: postgresql
+    rules:
+
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL/Citus coordinator inaccessible"
+          description: "Le coordinator Citus ne répond plus aux connexions PostgreSQL."
+
+      - alert: PostgresReplicationLag
+        expr: pg_replication_lag > 30
+        for: 2m
+        # Lag de réplication supérieur à 30 secondes pendant 2 minutes.
+        # Un lag élevé signifie que le Slave accumule du retard :
+        # si le Master tombe dans cet état, le failover entraînerait
+        # une perte des transactions correspondant au lag accumulé.
+        labels:
+          severity: warning
+        annotations:
+          summary: "Lag de réplication PostgreSQL élevé : {{ $value }}s"
+          description: "Le Slave accuse {{ $value }}s de retard sur le Master. Risque de perte de données en cas de failover."
+
+      - alert: PostgresReplicationLagCritical
+        expr: pg_replication_lag > 120
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Lag de réplication critique : {{ $value }}s"
+          description: "Lag de {{ $value }}s — intervention immédiate requise."
+
+      - alert: PostgresTooManyConnections
+        expr: |
+          pg_stat_activity_count > pg_settings_max_connections * 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL : connexions proches du maximum"
+          description: "{{ $value }} connexions actives sur {{ pg_settings_max_connections }} autorisées (>85%)."
+
+      - alert: CitusWorkerDown
+        expr: citus_node_connection_count{node_role="worker"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Worker Citus {{ $labels.node_name }} inaccessible"
+          description: "Le worker Citus {{ $labels.node_name }} n'est plus joignable depuis le coordinator. Les requêtes sur ses shards échouent."
