@@ -9,7 +9,7 @@ import clustersRouter from './routes/clusters.js';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.API_PORT || 4000;
+const PORT = process.env.API_PORT || 8000;
 
 app.use(cors());
 app.use(express.json());

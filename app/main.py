@@ -276,3 +276,19 @@ def get_meteo(
 
     cols = [c for c in ("numer_sta", "date", "t", "u", "ff", "pres", "rr3") if c in df.columns]
     return _to_records(df[cols].head(limit))
+
+@app.get("/stations", tags=["Données brutes"], summary="Liste des stations de pollution")
+def get_stations() -> list[dict]:
+    """Retourne la liste des stations de pollution avec leurs coordonnées."""
+    _ensure_data()
+
+    station_coords = fetch_pollution_stations()
+    return _to_records(station_coords[["station_id", "latitude", "longitude"]])
+
+@app.get("/clusters", tags=["Données brutes"], summary="Liste des stations de pollution")
+def get_stations() -> list[dict]:
+    """Retourne la liste des stations de pollution avec leurs coordonnées."""
+    _ensure_data()
+
+    station_coords = fetch_pollution_stations()
+    return _to_records(station_coords[["station_id", "latitude", "longitude"]])
