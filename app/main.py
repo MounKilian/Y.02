@@ -285,10 +285,59 @@ def get_stations() -> list[dict]:
     station_coords = fetch_pollution_stations()
     return _to_records(station_coords[["station_id", "latitude", "longitude"]])
 
-@app.get("/clusters", tags=["Données brutes"], summary="Liste des stations de pollution")
-def get_stations() -> list[dict]:
-    """Retourne la liste des stations de pollution avec leurs coordonnées."""
-    _ensure_data()
 
-    station_coords = fetch_pollution_stations()
-    return _to_records(station_coords[["station_id", "latitude", "longitude"]])
+# ---------------------------------------------------------------------------
+# Endpoint d'intégration Dev (format attendu par le worker Node)
+# ---------------------------------------------------------------------------
+
+
+@app.get(
+    "/data",
+    tags=["Intégration"],
+    summary="Données formatées pour le worker Dev",
+)
+def get_data_for_worker(
+    limit: int = Query(500, ge=1, le=5000),
+) -> dict:
+    """
+    Retourne les données IPMA au format attendu par le worker Node.js :
+    { data: [{ station: {...}, date_start, date_end, pollution_index, ... }] }
+    """
+    _ensure_data()
+    df: pd.DataFrame = _cache["ipma_df"]
+    poll_stations = fetch_pollution_stations()
+
+    station_info = {}
+    for _, row in poll_stations.iterrows():
+        sid = str(row.get("station_id", ""))
+        station_info[sid] = {
+            "code": sid,
+            "name": str(row.get("nom_station", row.get("station_id", ""))),
+            "latitude": _sanitize(row.get("latitude")),
+            "longitude": _sanitize(row.get("longitude")),
+            "commune": str(row.get("commune", "")),
+            "type_implantation": str(row.get("type_d'implantation", row.get("type_implantation", ""))),
+        }
+
+    records = []
+    for _, row in df.dropna(subset=["ipma"]).sort_values("heure", ascending=False).head(limit).iterrows():
+        sid = str(row.get("station_id", ""))
+        heure = row.get("heure")
+        t_k = row.get("t")
+        pres_pa = row.get("pres")
+
+        records.append({
+            "station": station_info.get(sid, {"code": sid, "name": sid, "latitude": None, "longitude": None, "commune": "", "type_implantation": ""}),
+            "date_start": _sanitize(heure),
+            "date_end": _sanitize(heure + pd.Timedelta(hours=1)) if heure is not None else None,
+            "pollution_index": round(float(row["ipma"]) * 100) if row.get("ipma") is not None else None,
+            "temperature": round(float(t_k) - 273.15, 1) if t_k is not None and not np.isnan(float(t_k)) else None,
+            "humidity": _sanitize(row.get("u")),
+            "wind_speed": _sanitize(row.get("ff")),
+            "pm25": _sanitize(row.get("PM25")),
+            "pm10": _sanitize(row.get("PM10")),
+            "no2": _sanitize(row.get("NO2")),
+            "o3": _sanitize(row.get("O3")),
+        })
+
+    return {"data": records}
