@@ -154,7 +154,14 @@ export default function LandingPage() {
           ))}
         </div>
         <div className="hero-content">
-          <img src="/images/logo.png" alt="AirViz" className="hero-logo" />
+          <video
+            className="hero-logo-video"
+            src="/images/logo-anim.mp4"
+            autoPlay
+            loop
+            muted
+            playsInline
+          />
           <div className="hero-badge">Challenge 48h — Y.02</div>
           <h1 className="hero-title">
             Respirez-vous<br />

@@ -97,13 +97,15 @@
   padding: 0 24px;
 }
 
-.hero-logo {
-  width: 72px;
-  height: 72px;
+.hero-logo-video {
+  width: 120px;
+  height: 120px;
   margin: 0 auto 24px;
   display: block;
+  mix-blend-mode: screen;
   animation: fade-in-up 0.8s ease both;
-  filter: drop-shadow(0 0 24px rgba(16, 185, 129, 0.4));
+  pointer-events: none;
+  object-fit: contain;
 }
 
 .hero-badge {
