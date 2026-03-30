@@ -25,10 +25,10 @@ function useReveal() {
   return [ref, visible];
 }
 
-function Section({ children, className = '' }) {
+function Section({ children, className = '', id }) {
   const [ref, visible] = useReveal();
   return (
-    <section ref={ref} className={`landing-section ${className} ${visible ? 'revealed' : ''}`}>
+    <section ref={ref} id={id} className={`landing-section ${className} ${visible ? 'revealed' : ''}`}>
       {children}
     </section>
   );
@@ -157,6 +157,7 @@ export default function LandingPage() {
           ))}
         </div>
         <div className="hero-content">
+          <img src="/images/logo.png" alt="AirViz" className="hero-logo" />
           <div className="hero-badge">Challenge 48h — Y.02</div>
           <h1 className="hero-title">
             Respirez-vous<br />
@@ -311,13 +312,6 @@ export default function LandingPage() {
               <p>PM2.5, PM10, NO₂, O₃, SO₂, CO, NOx, NO, Benzene — chaque mesure detaillee.</p>
             </div>
           </div>
-        </div>
-      </Section>
-
-      {/* ── Image France ─────────────────── */}
-      <Section className="france-section">
-        <div className="france-image-wrapper">
-          <img src="/images/france-data.png" alt="France data visualization" className="france-image" />
         </div>
       </Section>
 
