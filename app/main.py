@@ -12,6 +12,7 @@ Documentation interactive auto-générée :
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime
 from typing import Any
@@ -105,6 +106,31 @@ def _load_data() -> None:
 def _ensure_data() -> None:
     if _cache["ipma_df"] is None:
         _load_data()
+
+
+# ---------------------------------------------------------------------------
+# Auto-refresh toutes les 5 minutes
+# ---------------------------------------------------------------------------
+
+REFRESH_INTERVAL = 5 * 60  # 5 minutes
+
+
+async def _auto_refresh_loop() -> None:
+    """Boucle de rafraîchissement automatique des données."""
+    # Premier chargement au démarrage
+    _load_data()
+    while True:
+        await asyncio.sleep(REFRESH_INTERVAL)
+        try:
+            logger.info("Auto-refresh déclenché")
+            _load_data()
+        except Exception as exc:
+            logger.error("Erreur auto-refresh : %s", exc)
+
+
+@app.on_event("startup")
+async def startup_event() -> None:
+    asyncio.create_task(_auto_refresh_loop())
 
 
 # ---------------------------------------------------------------------------
