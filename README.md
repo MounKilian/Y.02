@@ -40,10 +40,6 @@ AirViz permet de visualiser en temps réel la qualité de l'air sur le territoir
    ```sh
    npm run dev
    ```
-3. (Optionnel) Rensemencer la base de données :
-   ```sh
-   npm run seed
-   ```
 
 ## Structure du projet
 
