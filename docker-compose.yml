@@ -1,21 +1,31 @@
 name: airviz
 services:
   proxy:
-    image: 'jc21/nginx-proxy-manager:latest'
+    image: nginx:alpine
+    restart: always
     ports:
-      - '80:80'   # Public HTTP
-      - '81:81'   # Admin UI for the Proxy
-      # - '443:443' # Public HTTPS
+      - 80:80
     volumes:
-      - ./proxy/data:/data
-      - ./proxy/letsencrypt:/etc/letsencrypt
+      - ./proxy/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - site
+      - api
 
   db:
     image: postgres
     restart: always
     shm_size: 128mb
+    # ports:
+    #  - 5432:5432
     environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   api:
     build: ./app
@@ -23,21 +33,32 @@ services:
     # ports:
     #   - 8000:8000
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   server:
     build: ./server
     restart: always
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres
     # ports:
     #   - 4000:4000
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
   site:
     build: ./client
     restart: always
-    # ports:
-    #   - 80:80
     depends_on:
       - server
 

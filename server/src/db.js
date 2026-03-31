@@ -1,14 +1,15 @@
 import pg from 'pg';
 
 const { Pool } = pg;
-
+console.log(process.env);
+console.log(`[DB] Connecting to PostgreSQL at ${process.env.DB_HOST || 'error'}:${process.env.DB_PORT || '5432'}`);
 const pool = new Pool({
-  host:     process.env.DB_HOST     || 'localhost',
-  port:     parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME     || 'y02',
-  user:     process.env.DB_USER     || 'admin',
-  password: process.env.DB_PASSWORD || 'admin',
-  max: 10, 
+  host: process.env.DB_HOST || 'db',
+  port: parseInt(process.env.DB_PORT || '5432'),
+  database: process.env.DB_NAME || 'postgres',
+  user: process.env.DB_USER || 'postgres',
+  password: process.env.DB_PASSWORD || 'postgres',
+  max: 10,
 });
 
 export async function initDb() {
