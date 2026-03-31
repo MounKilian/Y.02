@@ -10,10 +10,8 @@ Carte interactive avec données pollution et météo, filtrage par région/date/
 1. [Présentation](#présentation)
 2. [Stack technique](#stack-technique)
 3. [Installation & Lancement](#installation--lancement)
-4. [Structure du projet](#structure-du-projet)
-5. [Fonctionnalités](#fonctionnalités)
-6. [Sources de données](#sources-de-données)
-7. [Crédits](#crédits)
+4. [Fonctionnalités](#fonctionnalités)
+5. [Crédits](#crédits)
 
 ---
 
@@ -21,45 +19,46 @@ Carte interactive avec données pollution et météo, filtrage par région/date/
 
 AirViz permet de visualiser en temps réel la qualité de l'air sur le territoire français via une carte interactive. Les utilisateurs peuvent filtrer par région, date, polluant, et explorer les tendances grâce à des clusters et des statistiques détaillées.
 
+Calcul de l'indice : 
+On regarde combien chaque polluant dépasse le seuil
+On fait une moyenne pondérée 
+On ajuste selon la météo 
+On obtient un chiffre entre 0 et 1 
+On traduit ça en “Bon”, “Modéré”, “Mauvais” ou “Très mauvais”
+
+
+IPMA = Moyenne pondérée des polluants normalisés x Facteur météo
+
+Polluants normalisés : chaque polluant / seuil maximal
+Moyenne pondérée : certains polluants comptent plus que d’autres
+Facteur météo : ajuste selon vent, chaleur, pression, humidité
+
 ## Stack technique
 
 | Categorie | Outils                                 |
 | --------- | -------------------------------------- |
 | Frontend  | React, Vite, Leaflet, React-Leaflet    |
-| Backend   | Node.js, Express, SQLite, Supercluster |
+| Backend   | Node.js, Express, Postgree             |
 | Données   | data.gouv.fr (LCSQA, SYNOP)            |
 | Design    | Syne, IBM Plex Sans, Dark Sidebar      |
 
 ## Installation & Lancement
 
-1. Cloner le dépôt puis installer les dépendances :
-   ```sh
-   npm run install:all
-   ```
-2. Lancer l'application (client + serveur) :
-   ```sh
-   npm run dev
-   ```
+Commande pour lancer le projet : 
+- docker compose up --build
 
-## Structure du projet
+Lancement : 
+- localhost
 
-```
-Y.02/
-├── client/      # Frontend React + Vite
-├── server/      # Backend Express + SQLite
-├── worker/      # Tâches de fond (import, clustering)
-├── docs/        # Documentation et recherche
-└── README.md    # Ce fichier
-```
+Si erreur avec le port, changement dans la ligne 7 du docker-compose.yml
 
 ## Fonctionnalités
 
 - Carte interactive Leaflet avec clusters dynamiques
-- Filtres par région, date, polluant
+- Filtres par région et date
 - Statistiques et légende détaillées
 - Jointure pollution/météo par station
 - Backend API RESTful (pollution, météo, clusters)
-- Seed et import automatisés
 
 ## Sources de données
 
@@ -69,6 +68,3 @@ Y.02/
 ## Crédits
 
 Projet réalisé dans le cadre du Challenge 48h Y.02
-Développeurs : Arthur, ...
-Design : Syne, IBM Plex Sans
-Librairies : React, Leaflet, Supercluster, Express, SQLite
