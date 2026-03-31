@@ -48,9 +48,13 @@ Commande pour lancer le projet :
 - docker compose up --build
 
 Lancement : 
-- localhost
+- http://localhost
 
 Si erreur avec le port, changement dans la ligne 7 du docker-compose.yml
+      - <port choisi>:80
+au lieu de :
+      - 80:80
+puis aller à http://localhost:<port choisi>
 
 ## Fonctionnalités
 
