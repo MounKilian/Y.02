@@ -30,7 +30,9 @@ export async function fetchClusters({ zoom, bbox, dateFrom, dateTo, minIndex, ma
   if (minIndex !== undefined && minIndex !== '') params.set('minIndex', minIndex);
   if (maxIndex !== undefined && maxIndex !== '') params.set('maxIndex', maxIndex);
 
+  console.log("fetching:", `${API_BASE}/clusters?${params}`);
   const res = await fetch(`${API_BASE}/clusters?${params}`);
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  console.log("response:", res.clone().json());
+  if (!res.ok) throw new Error(`API error fetching (${API_BASE}/clusters?${params}): ${res.status}`);
   return res.json();
 }

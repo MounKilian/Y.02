@@ -25,7 +25,7 @@ async function start() {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  app.listen(PORT, () => {
+  app.listen(PORT, "0.0.0.0", () => {
     console.log(`[API] Running on http://localhost:${PORT}`);
   });
 }
