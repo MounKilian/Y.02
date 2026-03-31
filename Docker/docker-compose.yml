@@ -1,0 +1,317 @@
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+  replication_password:
+    file: ./secrets/replication_password.txt
+  jwt_secret:
+    file: ./secrets/jwt_secret.txt
+  grafana_password:
+    file: ./secrets/grafana_password.txt
+
+volumes:
+  db_master_data:
+  db_slave_data:
+  db_worker1_data:
+  db_worker2_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  network_public:
+    driver: bridge
+  network_internal:
+    driver: bridge
+    internal: true
+  network_monitoring:
+    driver: bridge
+
+services:
+
+  #  FRONTEND (commented) 
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile
+  #   image: airwiz-frontend:latest
+  #   container_name: frontend
+  #   restart: unless-stopped
+  #   networks:
+  #     - network_public
+  #   ports:
+  #     - "80:80"
+  #   environment:
+  #     BACKEND_URL: http://backend:3000
+  #   volumes:
+  #     - ./frontend/nginx.conf:/etc/nginx/templates/default.conf.template:ro
+  #   depends_on:
+  #     backend:
+  #       condition: service_healthy
+  #   healthcheck:
+  #     test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+  #     interval: 30s
+  #     timeout: 5s
+  #     retries: 3
+  #     start_period: 15s
+
+  #  BACKEND (commented) 
+  # backend:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile
+  #   image: airwiz-backend:latest
+  #   container_name: backend
+  #   restart: unless-stopped
+  #   networks:
+  #     - network_public
+  #     - network_internal
+  #   secrets:
+  #     - postgres_password
+  #     - jwt_secret
+  #   environment:
+  #     NODE_ENV: production
+  #     PORT: 3000
+  #     DB_HOST: citus_master
+  #     DB_PORT: 5432
+  #     DB_USER: ${POSTGRES_USER:-airwiz_user}
+  #     DB_NAME: ${POSTGRES_DB:-airwiz}
+  #     DATA_SERVICE_URL: http://service_data:3001
+  #     COLLECT_INTERVAL_MS: ${COLLECT_INTERVAL_MS:-3600000}
+  #   depends_on:
+  #     citus_master:
+  #       condition: service_healthy
+  #   healthcheck:
+  #     test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+  #     interval: 30s
+  #     timeout: 5s
+  #     retries: 3
+  #     start_period: 30s
+
+  #  SERVICE DATA (commented) 
+  # service_data:
+  #   build:
+  #     context: ./service-data
+  #     dockerfile: Dockerfile
+  #   image: airwiz-service-data:latest
+  #   container_name: service_data
+  #   restart: unless-stopped
+  #   networks:
+  #     - network_internal
+  #   secrets:
+  #     - postgres_password
+  #   environment:
+  #     NODE_ENV: production
+  #     PORT: 3001
+  #     DB_HOST: citus_master
+  #     DB_PORT: 5432
+  #     DB_USER: ${POSTGRES_USER:-airwiz_user}
+  #     DB_NAME: ${POSTGRES_DB:-airwiz}
+  #     OPENDATA_METEO_URL: ${OPENDATA_METEO_URL:-https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/donnees-synop-essentielles-omm/records}
+  #     OPENDATA_POLLUTION_URL: ${OPENDATA_POLLUTION_URL:-https://www.data.gouv.fr/fr/datasets/r/944df601-6a0b-4c9a-a054-6f6e0e33db70}
+  #     COLLECT_INTERVAL_MS: ${COLLECT_INTERVAL_MS:-3600000}
+  #   depends_on:
+  #     citus_master:
+  #       condition: service_healthy
+  #   healthcheck:
+  #     test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+  #     interval: 30s
+  #     timeout: 5s
+  #     retries: 3
+  #     start_period: 30s
+
+  #  CITUS WORKER 1 
+  citus_worker1:
+    image: citusdata/citus:12.1
+    container_name: citus_worker1
+    restart: unless-stopped
+    networks:
+      - network_internal
+    secrets:
+      - postgres_password
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-airwiz_user}
+      POSTGRES_DB: ${POSTGRES_DB:-airwiz}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    volumes:
+      - db_worker1_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-airwiz_user} -d ${POSTGRES_DB:-airwiz}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  #  CITUS WORKER 2 
+  citus_worker2:
+    image: citusdata/citus:12.1
+    container_name: citus_worker2
+    restart: unless-stopped
+    networks:
+      - network_internal
+    secrets:
+      - postgres_password
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-airwiz_user}
+      POSTGRES_DB: ${POSTGRES_DB:-airwiz}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    volumes:
+      - db_worker2_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-airwiz_user} -d ${POSTGRES_DB:-airwiz}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  #  CITUS MASTER 
+  citus_master:
+    image: citusdata/citus:12.1
+    container_name: citus_master
+    restart: unless-stopped
+    networks:
+      - network_internal
+    secrets:
+      - postgres_password
+      - replication_password
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-airwiz_user}
+      POSTGRES_DB: ${POSTGRES_DB:-airwiz}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    volumes:
+      - db_master_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    depends_on:
+      citus_worker1:
+        condition: service_healthy
+      citus_worker2:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-airwiz_user} -d ${POSTGRES_DB:-airwiz}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  #  CITUS SLAVE 
+  citus_slave:
+    image: citusdata/citus:12.1
+    container_name: citus_slave
+    restart: unless-stopped
+    networks:
+      - network_internal
+    secrets:
+      - postgres_password
+      - replication_password
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-airwiz_user}
+      POSTGRES_DB: ${POSTGRES_DB:-airwiz}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      PRIMARY_HOST: citus_master
+      PRIMARY_PORT: 5432
+      REPLICATION_USER: replicator
+    volumes:
+      - db_slave_data:/var/lib/postgresql/data
+      - ./postgres/slave/init-slave.sh:/docker-entrypoint-initdb.d/init-slave.sh:ro
+    depends_on:
+      citus_master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-airwiz_user} -d ${POSTGRES_DB:-airwiz}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+
+  #  CADVISOR 
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: cadvisor
+    restart: unless-stopped
+    networks:
+      - network_monitoring
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+    privileged: true
+
+  #  PROMETHEUS 
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: prometheus
+    restart: unless-stopped
+    networks:
+      - network_monitoring
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/rules.yml:/etc/prometheus/rules.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle"
+    depends_on:
+      - cadvisor
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  #  GRAFANA 
+  # Access : http://localhost:3000
+  # Login  : admin / content of secrets/grafana_password.txt
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: grafana
+    restart: unless-stopped
+    networks:
+      - network_monitoring
+      - network_public
+    ports:
+      - "3000:3000"
+    secrets:
+      - grafana_password
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_password
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  #  POSTGRES EXPORTER 
+  postgres_exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: postgres_exporter
+    restart: unless-stopped
+    networks:
+      - network_internal
+      - network_monitoring
+    secrets:
+      - postgres_password
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER:-airwiz_user}@citus_master:5432/${POSTGRES_DB:-airwiz}?sslmode=disable"
+      DATA_SOURCE_PASS_FILE: /run/secrets/postgres_password
+    depends_on:
+      citus_master:
+        condition: service_healthy
+
+  #  K6 (profile "test" only) 
+  k6:
+    image: grafana/k6:latest
+    container_name: k6
+    profiles:
+      - test
+    volumes:
+      - ./k6:/scripts
+    entrypoint: ["k6", "run", "/scripts/test.js"]
+    networks:
+      - network_public
