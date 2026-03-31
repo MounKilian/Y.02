@@ -152,26 +152,48 @@ def fetch_pollution_stations() -> pd.DataFrame:
         df_stations = xls.parse(xls.sheet_names[0])
         df_stations.columns = [c.strip().lower().replace(" ", "_") for c in df_stations.columns]
 
+    # Supprime les doublons de colonnes
+    df_stations = df_stations.loc[:, ~df_stations.columns.duplicated()]
+
+    # Renommage direct basé sur les vraies colonnes du XLS
     rename = {}
-    # On ne renomme que la première colonne trouvée pour chaque cible
-    # afin d'éviter les colonnes dupliquées après rename.
     targets_used: set[str] = set()
     for c in df_stations.columns:
         cl = c.lower()
         if "latitude" in cl and "latitude" not in targets_used:
             rename[c] = "latitude"; targets_used.add("latitude")
-        elif "lat" in cl and "latitude" not in targets_used:
-            rename[c] = "latitude"; targets_used.add("latitude")
         elif "longitude" in cl and "longitude" not in targets_used:
             rename[c] = "longitude"; targets_used.add("longitude")
-        elif "lon" in cl and "longitude" not in targets_used:
-            rename[c] = "longitude"; targets_used.add("longitude")
-        elif "code" in cl and "station" in cl and "station_id" not in targets_used:
+        elif ("natlstationcode" in cl or ("code" in cl and "station" in cl)) and "station_id" not in targets_used:
             rename[c] = "station_id"; targets_used.add("station_id")
+        elif "municipality" in cl and "commune" not in targets_used:
+            rename[c] = "commune"; targets_used.add("commune")
+        elif "areaclassification" in cl and "type_implantation" not in targets_used:
+            rename[c] = "type_implantation"; targets_used.add("type_implantation")
 
     df_stations = df_stations.rename(columns=rename)
-    # Supprime les doublons de colonnes éventuels et garde la première occurrence
-    df_stations = df_stations.loc[:, ~df_stations.columns.duplicated()]
+
+    if "station_id" in df_stations.columns:
+        df_stations["station_id"] = (
+            df_stations["station_id"]
+            .astype(str)
+            .str.replace(r"^STA-", "", regex=True)
+            .str.strip()
+        )
+
+    if "type_implantation" in df_stations.columns:
+        df_stations["type_implantation"] = (
+            df_stations["type_implantation"]
+            .astype(str)
+            .str.split("/")
+            .str[-1]
+            .str.capitalize()
+        )
+
+    if "commune" not in df_stations.columns:
+        df_stations["commune"] = ""
+    if "type_implantation" not in df_stations.columns:
+        df_stations["type_implantation"] = ""
 
     for col in ("latitude", "longitude"):
         if col in df_stations.columns:

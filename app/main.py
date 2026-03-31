@@ -108,12 +108,7 @@ def _ensure_data() -> None:
         _load_data()
 
 
-# ---------------------------------------------------------------------------
-# Auto-refresh toutes les 5 minutes
-# ---------------------------------------------------------------------------
-
-REFRESH_INTERVAL = 5 * 60  # 5 minutes
-
+REFRESH_INTERVAL = 60 * 60  
 
 async def _auto_refresh_loop() -> None:
     """Boucle de rafraîchissement automatique des données."""
@@ -344,6 +339,8 @@ def get_data_for_worker(
             "commune": str(row.get("commune", "")),
             "type_implantation": str(row.get("type_d'implantation", row.get("type_implantation", ""))),
         }
+
+    logger.info("Sample station_info: %s", list(station_info.values())[:3])    
 
     records = []
     for _, row in df.dropna(subset=["ipma"]).sort_values("heure", ascending=False).head(limit).iterrows():

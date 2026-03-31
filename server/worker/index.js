@@ -17,7 +17,9 @@ const upsertStation = db.prepare(`
   ON CONFLICT(code) DO UPDATE SET
     name = excluded.name,
     latitude = excluded.latitude,
-    longitude = excluded.longitude
+    longitude = excluded.longitude,
+    commune = excluded.commune,
+    type_implantation = excluded.type_implantation
 `);
 
 const insertMeasurement = db.prepare(`

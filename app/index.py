@@ -119,10 +119,19 @@ def compute_ipma(row: pd.Series) -> dict:
 
 def compute_ipma_dataframe(merged: pd.DataFrame) -> pd.DataFrame:
     """Applique compute_ipma() sur tout le DataFrame et ajoute les colonnes résultat."""
+    if merged.empty:
+        out = merged.copy()
+        for col in ("ipma", "categorie", "pollution_score", "meteo_factor"):
+            out[col] = pd.Series(dtype="object")
+        return out
+
     results = pd.DataFrame(list(merged.apply(compute_ipma, axis=1)))
     out = merged.copy()
-    out["ipma"] = results["ipma"]
-    out["categorie"] = results["categorie"]
-    out["pollution_score"] = results["pollution_score"]
-    out["meteo_factor"] = results["meteo_factor"]
+
+    for col in ("ipma", "categorie", "pollution_score", "meteo_factor"):
+        if col in results.columns:
+            out[col] = results[col].values
+        else:
+            out[col] = None
+
     return out
