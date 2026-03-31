@@ -14,19 +14,23 @@ const PORT = process.env.API_PORT || 4000;
 app.use(cors());
 app.use(express.json());
 
-// Init database
-const db = initDb();
+async function start() {
+  const db = await initDb();
 
-// Routes
-app.use('/api/stations', stationsRouter(db));
-app.use('/api/mock', mockRouter);
-app.use('/api/clusters', clustersRouter(db));
+  app.use('/api/stations', stationsRouter(db));
+  app.use('/api/mock', mockRouter);
+  app.use('/api/clusters', clustersRouter(db));
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+  app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
 
-app.listen(PORT, () => {
-  console.log(`[API] Running on http://localhost:${PORT}`);
+  app.listen(PORT, () => {
+    console.log(`[API] Running on http://localhost:${PORT}`);
+  });
+}
+
+start().catch((err) => {
+  console.error('[API] Failed to start:', err);
+  process.exit(1);
 });

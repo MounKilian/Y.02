@@ -1,6 +1,4 @@
-import { initDb } from './db.js';
-
-const db = initDb();
+import { initDb, pool } from './db.js';
 
 // ~100 stations francaises reelles (positions approximatives)
 const STATIONS = [
@@ -141,93 +139,121 @@ const STATIONS = [
   { code: 'FR35103', name: 'Rural Alpes Sud', lat: 44.250, lng: 6.517, commune: 'Barcelonnette', type: 'Rurale' },
 ];
 
-// Insert statements
-const insertStation = db.prepare(`
-  INSERT OR IGNORE INTO stations (code, name, latitude, longitude, commune, type_implantation)
-  VALUES (?, ?, ?, ?, ?, ?)
-`);
+function generateMeasurementsForStation(station, now, days) {
+  const rows = [];
 
-const insertMeasurement = db.prepare(`
-  INSERT INTO measurements (station_code, date_start, date_end, pollution_index, temperature, humidity, wind_speed, pm25, pm10, no2, o3)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-`);
+  for (let d = days; d >= 0; d--) {
+    for (let h = 0; h < 24; h++) {
+      const dateStart = new Date(now);
+      dateStart.setDate(dateStart.getDate() - d);
+      dateStart.setHours(h, 0, 0, 0);
 
-// Generate mock measurements for the last 7 days, every hour
-function generateMeasurements() {
-  const now = new Date();
-  const days = 7;
+      const dateEnd = new Date(dateStart);
+      dateEnd.setHours(h + 1);
 
-  const insertMany = db.transaction(() => {
-    for (const station of STATIONS) {
-      insertStation.run(station.code, station.name, station.lat, station.lng, station.commune, station.type);
+      const basePollution = station.type === 'Industrielle' ? 55
+        : station.type === 'Urbaine' ? 40
+        : station.type === 'Periurbaine' ? 25
+        : 10;
+
+      const rushHourBonus = (h >= 8 && h <= 10) || (h >= 17 && h <= 19) ? 15 : 0;
+      const noise = (Math.random() - 0.5) * 20;
+
+      const pm25 = Math.max(0, basePollution * 0.6 + noise * 0.5 + rushHourBonus * 0.5);
+      const pm10 = Math.max(0, pm25 * 1.8 + (Math.random() - 0.5) * 10);
+      const no2  = Math.max(0, basePollution * 0.8 + rushHourBonus + noise);
+      const o3   = Math.max(0, 60 - no2 * 0.5 + (Math.random() - 0.5) * 15);
+
+      const pollutionIndex = Math.min(100, Math.max(0,
+        Math.round(pm25 * 0.3 + pm10 * 0.1 + no2 * 0.35 + (100 - o3) * 0.25 + noise * 0.2)
+      ));
+
+      const baseTemp   = 15 - (station.lat - 43) * 0.8;
+      const temperature = Math.round((baseTemp + Math.sin(h / 24 * Math.PI * 2 - Math.PI / 2) * 5 + (Math.random() - 0.5) * 3) * 10) / 10;
+      const humidity   = Math.min(100, Math.max(20, Math.round(65 + (Math.random() - 0.5) * 30)));
+      const windSpeed  = Math.max(0, Math.round((5 + (Math.random() - 0.5) * 8) * 10) / 10);
+
+      rows.push([
+        station.code,
+        dateStart.toISOString(),
+        dateEnd.toISOString(),
+        pollutionIndex,
+        temperature,
+        humidity,
+        windSpeed,
+        Math.round(pm25 * 10) / 10,
+        Math.round(pm10 * 10) / 10,
+        Math.round(no2  * 10) / 10,
+        Math.round(o3   * 10) / 10,
+      ]);
     }
+  }
 
-    for (let d = days; d >= 0; d--) {
-      for (let h = 0; h < 24; h++) {
-        const dateStart = new Date(now);
-        dateStart.setDate(dateStart.getDate() - d);
-        dateStart.setHours(h, 0, 0, 0);
-
-        const dateEnd = new Date(dateStart);
-        dateEnd.setHours(h + 1);
-
-        for (const station of STATIONS) {
-          // Base pollution varies by station type
-          const basePollution = station.type === 'Industrielle' ? 55
-            : station.type === 'Urbaine' ? 40
-            : station.type === 'Periurbaine' ? 25
-            : 10;
-
-          // Higher during rush hours 8-10, 17-19
-          const rushHourBonus = (h >= 8 && h <= 10) || (h >= 17 && h <= 19) ? 15 : 0;
-          const noise = (Math.random() - 0.5) * 20;
-
-          const pm25 = Math.max(0, basePollution * 0.6 + noise * 0.5 + rushHourBonus * 0.5);
-          const pm10 = Math.max(0, pm25 * 1.8 + (Math.random() - 0.5) * 10);
-          const no2 = Math.max(0, basePollution * 0.8 + rushHourBonus + noise);
-          const o3 = Math.max(0, 60 - no2 * 0.5 + (Math.random() - 0.5) * 15);
-
-          // Combined pollution index (0-100)
-          const pollutionIndex = Math.min(100, Math.max(0,
-            Math.round(pm25 * 0.3 + pm10 * 0.1 + no2 * 0.35 + (100 - o3) * 0.25 + noise * 0.2)
-          ));
-
-          // Weather — varies by latitude
-          const baseTemp = 15 - (station.lat - 43) * 0.8;
-          const temperature = Math.round((baseTemp + Math.sin(h / 24 * Math.PI * 2 - Math.PI / 2) * 5 + (Math.random() - 0.5) * 3) * 10) / 10;
-          const humidity = Math.min(100, Math.max(20, Math.round(65 + (Math.random() - 0.5) * 30)));
-          const windSpeed = Math.max(0, Math.round((5 + (Math.random() - 0.5) * 8) * 10) / 10);
-
-          insertMeasurement.run(
-            station.code,
-            dateStart.toISOString(),
-            dateEnd.toISOString(),
-            pollutionIndex,
-            temperature,
-            humidity,
-            windSpeed,
-            Math.round(pm25 * 10) / 10,
-            Math.round(pm10 * 10) / 10,
-            Math.round(no2 * 10) / 10,
-            Math.round(o3 * 10) / 10
-          );
-        }
-      }
-    }
-  });
-
-  insertMany();
+  return rows;
 }
 
-// Clean + seed
-db.exec('DELETE FROM measurements');
-db.exec('DELETE FROM stations');
+async function seed() {
+  await initDb(); // crée les tables si besoin
 
-console.log(`[Seed] Generating mock data for ${STATIONS.length} stations x 7 days x 24h...`);
-generateMeasurements();
+  const client = await pool.connect();
 
-const stationCount = db.prepare('SELECT COUNT(*) as c FROM stations').get().c;
-const measureCount = db.prepare('SELECT COUNT(*) as c FROM measurements').get().c;
-console.log(`[Seed] Done: ${stationCount} stations, ${measureCount} measurements`);
+  try {
+    await client.query('BEGIN');
 
-db.close();
+    // Nettoyage
+    await client.query('DELETE FROM measurements');
+    await client.query('DELETE FROM stations');
+
+    // Insertion des stations
+    for (const station of STATIONS) {
+      await client.query(
+        `INSERT INTO stations (code, name, latitude, longitude, commune, type_implantation)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (code) DO NOTHING`,
+        [station.code, station.name, station.lat, station.lng, station.commune, station.type]
+      );
+    }
+
+    // Insertion des mesures station par station (évite un tableau géant en mémoire)
+    const now  = new Date();
+    const days = 7;
+
+    console.log(`[Seed] Generating mock data for ${STATIONS.length} stations x ${days} days x 24h...`);
+
+    for (const station of STATIONS) {
+      const rows = generateMeasurementsForStation(station, now, days);
+
+      // Insertion en batch avec un seul INSERT multi-valeurs par station
+      const placeholders = rows.map((_, i) => {
+        const base = i * 11;
+        return `($${base+1},$${base+2},$${base+3},$${base+4},$${base+5},$${base+6},$${base+7},$${base+8},$${base+9},$${base+10},$${base+11})`;
+      }).join(',');
+
+      await client.query(
+        `INSERT INTO measurements
+           (station_code, date_start, date_end, pollution_index, temperature, humidity, wind_speed, pm25, pm10, no2, o3)
+         VALUES ${placeholders}`,
+        rows.flat()
+      );
+    }
+
+    await client.query('COMMIT');
+
+    const { rows: [sc] } = await client.query('SELECT COUNT(*) AS c FROM stations');
+    const { rows: [mc] } = await client.query('SELECT COUNT(*) AS c FROM measurements');
+    console.log(`[Seed] Done: ${sc.c} stations, ${mc.c} measurements`);
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[Seed] Error, transaction rolled back:', err);
+    throw err;
+  } finally {
+    client.release();
+    await pool.end();
+  }
+}
+
+seed().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
