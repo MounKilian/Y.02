@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>POWER4.EXE — Puissance 4</title>
+  <link rel="icon" href="data:,">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="grid-bg" aria-hidden="true"></div>
+  <header>
+    <h1>◉ POWER4.EXE ◉</h1>
+  </header>
+
+  <main>
+    <!-- START SCREEN -->
+    <section id="screen-start" class="screen">
+      <div class="welcome">
+        <h2>🎮 Bienvenue sur le Puissance 4 🎮</h2>
+        <p class="muted">C'est parti pour le tryhard.</p>
+      </div>
+
+      <form id="start-form" class="start-form" autocomplete="off">
+        <fieldset class="players-section">
+          <legend>👥 Joueurs</legend>
+          <div class="player-input">
+            <label for="player1">🔴 Joueur 1 (Rouge)</label>
+            <input id="player1" name="player1" required maxlength="20" placeholder="Joueur 1">
+          </div>
+          <div class="player-input">
+            <label for="player2">🟡 Joueur 2 (Jaune)</label>
+            <input id="player2" name="player2" required maxlength="20" placeholder="Joueur 2">
+          </div>
+        </fieldset>
+
+        <fieldset class="difficulty-section">
+          <legend>⚡ Difficulté</legend>
+          <div class="difficulty-options">
+            <label class="difficulty-option">
+              <input type="radio" name="difficulty" value="easy" checked>
+              <div class="difficulty-card easy">
+                <h4>😊 Facile</h4>
+                <p>Grille 6×7</p>
+                <span class="recommended">Recommandé pour débuter</span>
+              </div>
+            </label>
+            <label class="difficulty-option">
+              <input type="radio" name="difficulty" value="normal">
+              <div class="difficulty-card normal">
+                <h4>😎 Normal</h4>
+                <p>Grille 6×7</p>
+                <span class="recommended">Difficulté équilibrée</span>
+              </div>
+            </label>
+            <label class="difficulty-option">
+              <input type="radio" name="difficulty" value="hard">
+              <div class="difficulty-card hard">
+                <h4>😤 Difficile</h4>
+                <p>Grille 8×9</p>
+                <span class="recommended">Pour les experts</span>
+              </div>
+            </label>
+          </div>
+        </fieldset>
+
+        <button type="submit" class="start-btn">🚀 Lancer la partie</button>
+      </form>
+    </section>
+
+    <!-- GAME SCREEN -->
+    <section id="screen-game" class="screen hidden">
+      <div class="game-status" id="game-status"></div>
+      <div class="column-buttons" id="column-buttons"></div>
+      <div class="board" id="board"></div>
+      <div class="controls">
+        <button type="button" class="reset-btn" data-action="reset">🔄 Nouvelle partie</button>
+        <button type="button" class="ghost-btn" data-action="home">🏠 Accueil</button>
+      </div>
+    </section>
+
+    <!-- VICTORY SCREEN -->
+    <section id="screen-victory" class="screen hidden">
+      <div id="victory-content"></div>
+      <div class="victory-actions">
+        <button type="button" class="rematch-btn" data-action="rematch">🔄 Revanche</button>
+        <button type="button" class="new-game-btn" data-action="home">🆕 Nouvelle partie</button>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Jeu de Noé — porté en JS pour le portfolio</p>
+  </footer>
+
+  <script src="./game.js"></script>
+</body>
+</html>

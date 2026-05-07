@@ -1,0 +1,235 @@
+{
+  "profile": {
+    "name": "Noé",
+    "title": "Développeur @ Ynov Lyon",
+    "subtitle": "Passionate about web development and creative solutions",
+    "bio": "Étudiant développeur à Ynov Lyon. Je conçois des applications web modernes en Go, TypeScript et React, avec un goût prononcé pour les interfaces propres et les architectures simples.",
+    "email": "noe.leone@ynov.com",
+    "location": "Ynov Lyon",
+    "avatar": "",
+    "socials": [
+      {
+        "id": "s1",
+        "label": "GitHub",
+        "url": "https://github.com/Xeax69",
+        "icon": "github"
+      },
+      {
+        "id": "s2",
+        "label": "LinkedIn",
+        "url": "",
+        "icon": "linkedin"
+      }
+    ]
+  },
+  "projects": [
+    {
+      "id": "p1",
+      "title": "Power 4 Web",
+      "description": "Une implémentation web du Puissance 4, jouable à deux dans le navigateur. Originellement écrit en Go (server-side rendering, sessions), porté en JS pur pour pouvoir être joué directement depuis le portfolio.",
+      "technologies": [
+        "Go",
+        "HTML",
+        "CSS",
+        "JS"
+      ],
+      "githubUrl": "https://github.com/Xeax69/power4-web",
+      "demoUrl": "",
+      "image": "https://play-lh.googleusercontent.com/ugveQN5tbyuh8bucaMmhcC2_V3WB4oGPnyyIR4vQj7mXqTvqs2TGxmPD_A-3t15NL0Mw",
+      "order": 1,
+      "playUrl": "/runtime/power4-web/index.html"
+    },
+    {
+      "id": "p2",
+      "title": "Hera",
+      "description": "Projet expérimental autour d'une plateforme web modulaire. Architecture orientée composants, expérience utilisateur fluide et back-end léger.",
+      "technologies": [
+        "Go",
+        "TypeScript",
+        "Tailwind"
+      ],
+      "githubUrl": "https://github.com/Xeax69/Hera",
+      "demoUrl": "",
+      "image": "https://avatars.githubusercontent.com/u/242266362?s=200&v=4",
+      "order": 2,
+      "playUrl": ""
+    },
+    {
+      "id": "p3",
+      "title": "Armonik",
+      "description": "Application Go consommant l'API Groupie Trackers : recherche d'artistes, filtres dynamiques (membres, années, concerts) et affichage cartographique.",
+      "technologies": [
+        "Go",
+        "HTML",
+        "CSS",
+        "WebSocket",
+        "Docker"
+      ],
+      "githubUrl": "https://github.com/Lyon-Ynov-Campus/groupie-tracker-gp-armonik",
+      "demoUrl": "",
+      "image": "https://armonik.dyskolos.fr/static/image.png",
+      "order": 0,
+      "playUrl": "https://armonik.dyskolos.fr"
+    }
+  ],
+  "skills": [
+    {
+      "id": "k1",
+      "name": "TypeScript",
+      "category": "Frontend",
+      "level": 4
+    },
+    {
+      "id": "k2",
+      "name": "React",
+      "category": "Frontend",
+      "level": 4
+    },
+    {
+      "id": "k3",
+      "name": "Tailwind CSS",
+      "category": "Frontend",
+      "level": 4
+    },
+    {
+      "id": "k4",
+      "name": "Next.js",
+      "category": "Frontend",
+      "level": 3
+    },
+    {
+      "id": "k5",
+      "name": "Go",
+      "category": "Backend",
+      "level": 3
+    },
+    {
+      "id": "k6",
+      "name": "Node.js",
+      "category": "Backend",
+      "level": 3
+    },
+    {
+      "id": "k7",
+      "name": "SQL",
+      "category": "Backend",
+      "level": 3
+    },
+    {
+      "id": "k8",
+      "name": "Docker",
+      "category": "DevOps",
+      "level": 2
+    },
+    {
+      "id": "k9",
+      "name": "Git",
+      "category": "Tools",
+      "level": 5
+    },
+    {
+      "id": "k10",
+      "name": "VS Code",
+      "category": "Tools",
+      "level": 5
+    }
+  ],
+  "passions": {
+    "intro": "Quand je ne code pas, je joue, j'écoute, j'explore. Voici un peu de tout ça.",
+    "gaming": [
+      {
+        "id": "g1",
+        "game": "Counter-Strike 2",
+        "platform": "Faceit",
+        "username": "Xeax",
+        "url": "https://www.faceit.com/en/players/Xeax",
+        "rank": "Level — 10",
+        "accent": "#f4b21f",
+        "image": "https://gaming-cdn.com/images/products/13664/orig/counter-strike-2-pc-spiel-steam-cover.jpg?v=1695885435"
+      },
+      {
+        "id": "g2",
+        "game": "Rocket League",
+        "platform": "TRN Tracker",
+        "username": "Xeax",
+        "url": "https://rocketleague.tracker.network/rocket-league/profile/steam/76561198258062664/overview",
+        "rank": "Grand Champion 2",
+        "accent": "#3aa0ff",
+        "image": "https://www.maxilan.fr/wp-content/uploads/2020/11/rocket-league-une.jpg"
+      },
+      {
+        "id": "g3",
+        "game": "Steam",
+        "platform": "Steam Profile",
+        "username": "Xeax",
+        "url": "https://steamcommunity.com/id/Xeaxdu38/",
+        "rank": "",
+        "accent": "#059df5",
+        "image": "https://cdn.dlcompare.com/others_jpg/upload/news/image/20899.jpeg.webp"
+      },
+      {
+        "id": "g_8y63j1movb3doz",
+        "game": "Apex Legends",
+        "platform": "Steam",
+        "username": "Xeax",
+        "url": "https://steamcommunity.com/id/Xeaxdu38/",
+        "rank": "Master",
+        "accent": "#d400ff",
+        "image": "https://gaming-cdn.com/images/news/articles/9130/cover/la-saison-23-d-apex-legends-nous-offre-le-grand-retour-de-la-carte-originale-avec-des-armes-et-competences-classiques-cover672a4833f1b62.jpg"
+      },
+      {
+        "id": "g_ki3qtfmovbojcq",
+        "game": "Escape From Tarkov",
+        "platform": "BSG",
+        "username": "Xeax",
+        "url": "https://www.escapefromtarkov.com",
+        "rank": "",
+        "accent": "#a30000",
+        "image": "https://gaming-cdn.com/images/news/articles/16091/cover/1000x563/escape-from-tarkov-recoit-des-avis-plutot-negatifs-pour-ses-debuts-sur-steam-cover6919a64cb42ae.jpg"
+      },
+      {
+        "id": "g_hmoks5movbv02w",
+        "game": "Clair Obscur",
+        "platform": "Steam",
+        "username": "Xeax",
+        "url": "https://store.steampowered.com/app/1903340/Clair_Obscur_Expedition_33/",
+        "rank": "",
+        "accent": "#756c00",
+        "image": "https://cdna.artstation.com/p/assets/images/images/076/962/684/large/nicholas-maxson-francombe-2023-10-26-keyartexp33-full-33-1.jpg?1718222605"
+      }
+    ],
+    "music": [
+      {
+        "id": "m1",
+        "type": "playlist",
+        "title": "Mix Rock",
+        "artist": "Personnal mix",
+        "url": "https://open.spotify.com/playlist/37i9dQZF1EQpj7X7UK8OOF",
+        "coverUrl": "",
+        "note": ""
+      },
+      {
+        "id": "m2",
+        "type": "playlist",
+        "title": "Mix Métal",
+        "artist": "Personnal mix",
+        "url": "https://open.spotify.com/playlist/37i9dQZF1EQpgT26jgbgRI",
+        "coverUrl": "",
+        "note": ""
+      },
+      {
+        "id": "m3",
+        "type": "artist",
+        "title": "Daft Punk",
+        "artist": "Daft Punk",
+        "url": "https://open.spotify.com/artist/4tZwfgrHOc3mvqYlEYSvVi",
+        "coverUrl": "",
+        "note": ""
+      }
+    ]
+  },
+  "auth": {
+    "username": "Xeax",
+    "passwordHash": "$2a$10$YnWJ9iaKMy7i7ynn1cTWIudOVy/K3hfy6WMkQiEOL0nABUmZzwcyK"
+  }
+}
